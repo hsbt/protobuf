@@ -1896,8 +1896,8 @@ inline int32_t Reflection::IsEmptyOrCollectSetFields(
   } while (false)
 
   int i = -1;
-  for (const FieldDescriptor& field :
-       absl::MakeSpan(descriptor.fields_, last_non_weak_field_index_ + 1)) {
+  for (const FieldDescriptor& field : absl::MakeSpan(
+           descriptor.fields_.get(), last_non_weak_field_index_ + 1)) {
     ++i;
     const OneofDescriptor* containing_oneof = field.containing_oneof();
     if (schema_.InRealOneof(&field)) {
