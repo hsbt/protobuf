@@ -41,7 +41,7 @@
 //     void Foo(google::protobuf::RpcController* controller,
 //              const MyRequest* request,
 //              MyResponse* response,
-//              Closure* done) {
+//              std::function<void()> done) {
 //       // ... read request and fill in response ...
 //       done->Run();
 //     }
@@ -60,7 +60,7 @@
 //
 //   // ... fill in request ...
 //
-//   stub.Foo(&controller, request, &response, NewCallback(HandleResponse));
+//   stub.Foo(&controller, request, &response, HandleResponse);
 //
 // On Thread-Safety:
 //
@@ -77,6 +77,7 @@
 #ifndef GOOGLE_PROTOBUF_SERVICE_H__
 #define GOOGLE_PROTOBUF_SERVICE_H__
 
+#include <functional>
 #include <string>
 
 #include "google/protobuf/stubs/callback.h"
@@ -150,9 +151,15 @@ class PROTOBUF_EXPORT Service {
   // * If the RPC failed, "response"'s contents are undefined.  The
   //   RpcController can be queried to determine if an error occurred and
   //   possibly to get more information about the error.
+  //
+  // One overload of CallMethod must be implemented. The default implementations
+  // call each other to allow for migration between them.
   virtual void CallMethod(const MethodDescriptor* method,
                           RpcController* controller, const Message* request,
-                          Message* response, Closure* done) = 0;
+                          Message* response, std::function<void()> done);
+  virtual void CallMethod(const MethodDescriptor* method,
+                          RpcController* controller, const Message* request,
+                          Message* response, Closure* done);
 
   // CallMethod() requires that the request and response passed in are of a
   // particular subclass of Message.  GetRequestPrototype() and
@@ -235,7 +242,11 @@ class PROTOBUF_EXPORT RpcController {
   // will be called immediately.
   //
   // NotifyOnCancel() must be called no more than once per request.
-  virtual void NotifyOnCancel(Closure* callback) = 0;
+  //
+  // One overload of NotifyOnCancel must be implemented. The default
+  // implementations call each other to allow for migration between them.
+  virtual void NotifyOnCancel(std::function<void()> callback);
+  virtual void NotifyOnCancel(Closure* callback);
 };
 
 // Abstract interface for an RPC channel.  An RpcChannel represents a
@@ -258,11 +269,26 @@ class PROTOBUF_EXPORT RpcChannel {
   // are less strict in one important way:  the request and response objects
   // need not be of any specific class as long as their descriptors are
   // method->input_type() and method->output_type().
+  //
+  // One overload of CallMethod must be implemented. The default
+  // implementations call each other to allow for migration between them.
   virtual void CallMethod(const MethodDescriptor* method,
                           RpcController* controller, const Message* request,
-                          Message* response, Closure* done) = 0;
+                          Message* response, std::function<void()> done);
+  virtual void CallMethod(const MethodDescriptor* method,
+                          RpcController* controller, const Message* request,
+                          Message* response, Closure* done);
 };
 
+namespace service_internal {
+
+// A helper function for converting between Closure* and std::function<void()>.
+Closure* PROTOBUF_EXPORT ToClosure(std::function<void()> f);
+
+// A helper function for converting between Closure* and std::function<void()>.
+std::function<void()> PROTOBUF_EXPORT ToFunction(Closure* callback);
+
+}  // namespace service_internal
 }  // namespace protobuf
 }  // namespace google
 

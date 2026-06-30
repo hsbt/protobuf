@@ -1231,7 +1231,7 @@ class GENERATED_SERVICE_TEST_NAME : public testing::Test {
       foo_(descriptor_->FindMethodByName("Foo")),
       bar_(descriptor_->FindMethodByName("Bar")),
       stub_(&mock_channel_),
-      done_(::google::protobuf::NewPermanentCallback(&DoNothing)) {}
+      done_(NewPermanentCallback(&DoNothing)) {}
 
   void SetUp() override {
     ASSERT_TRUE(foo_ != nullptr);
