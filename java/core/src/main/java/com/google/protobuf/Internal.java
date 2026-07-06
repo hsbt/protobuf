@@ -209,6 +209,45 @@ public final class Internal {
     boolean isInRange(int number);
   }
 
+  /** An {@link EnumVerifier} that checks if a number is within a sequential range [min, max]. */
+  public static final class SequentialEnumVerifier implements EnumVerifier {
+    private final int min;
+    private final int max;
+
+    public SequentialEnumVerifier(int min, int max) {
+      this.min = min;
+      this.max = max;
+    }
+
+    @Override
+    public boolean isInRange(int number) {
+      return number >= min && number <= max;
+    }
+  }
+
+  /**
+   * An {@link EnumVerifier} that checks if a number is within a bitmask-defined set starting at a
+   * minimum value.
+   */
+  public static final class BitmaskEnumVerifier implements EnumVerifier {
+    private final int min;
+    private final long bitmask;
+
+    public BitmaskEnumVerifier(int min, long bitmask) {
+      this.min = min;
+      this.bitmask = bitmask;
+    }
+
+    @Override
+    public boolean isInRange(int number) {
+      int offset = number - min;
+      if (offset < 0 || offset >= 64) {
+        return false;
+      }
+      return (bitmask & (1L << offset)) != 0;
+    }
+  }
+
   /**
    * Helper method for implementing {@link Message#hashCode()} for longs.
    *

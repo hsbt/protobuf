@@ -12,6 +12,7 @@
 #include "google/protobuf/compiler/java/helpers.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <vector>
@@ -49,6 +50,52 @@ namespace java {
 
 using ::google::protobuf::internal::WireFormatLite;
 
+bool IsSequentialEnum(const EnumDescriptor* descriptor, int* min_val,
+                      int* max_val) {
+  if (descriptor->value_count() == 0) return false;
+  int min = descriptor->value(0)->number();
+  int max = min;
+  std::vector<int> values;
+  values.reserve(static_cast<size_t>(descriptor->value_count()));
+  for (int i = 0; i < descriptor->value_count(); i++) {
+    int val = descriptor->value(i)->number();
+    values.push_back(val);
+    if (val < min) min = val;
+    if (val > max) max = val;
+  }
+  std::sort(values.begin(), values.end());
+  values.erase(std::unique(values.begin(), values.end()), values.end());
+  int64_t range = static_cast<int64_t>(max) - static_cast<int64_t>(min) + 1;
+  if (static_cast<int64_t>(values.size()) != range) return false;
+  *min_val = min;
+  *max_val = max;
+  return true;
+}
+
+bool IsBitmaskEnum(const EnumDescriptor* descriptor, int* min_val,
+                   uint64_t* mask) {
+  if (descriptor->value_count() == 0) return false;
+  int min = descriptor->value(0)->number();
+  int max = min;
+  for (int i = 0; i < descriptor->value_count(); i++) {
+    int val = descriptor->value(i)->number();
+    if (val < min) min = val;
+    if (val > max) max = val;
+  }
+  int64_t diff = static_cast<int64_t>(max) - static_cast<int64_t>(min);
+  if (diff >= 64) return false;
+
+  uint64_t m = 0;
+  for (int i = 0; i < descriptor->value_count(); i++) {
+    int val = descriptor->value(i)->number();
+    int64_t offset = static_cast<int64_t>(val) - static_cast<int64_t>(min);
+    m |= (1ULL << offset);
+  }
+  *min_val = min;
+  *mask = m;
+  return true;
+}
+
 const char kThickSeparator[] =
     "// ===================================================================\n";
 const char kThinSeparator[] =
@@ -77,17 +124,34 @@ void PrintEnumVerifierLogic(
     const absl::flat_hash_map<absl::string_view, std::string>& variables,
     absl::string_view var_name, absl::string_view terminating_string,
     bool enforce_lite) {
-  std::string enum_verifier_string =
-      enforce_lite ? absl::StrCat(var_name, ".internalGetVerifier()")
-                   : absl::StrCat(
-                         "new com.google.protobuf.Internal.EnumVerifier() {\n"
-                         "        @java.lang.Override\n"
-                         "        public boolean isInRange(int number) {\n"
-                         "          return ",
-                         var_name,
-                         ".forNumber(number) != null;\n"
-                         "        }\n"
-                         "      }");
+  std::string enum_verifier_string;
+  if (enforce_lite) {
+    const EnumDescriptor* enum_desc = descriptor->enum_type();
+    int min_val = 0;
+    int max_val = 0;
+    uint64_t mask = 0;
+    if (IsSequentialEnum(enum_desc, &min_val, &max_val)) {
+      enum_verifier_string = absl::Substitute(
+          "new com.google.protobuf.Internal.SequentialEnumVerifier($0, $1)",
+          min_val, max_val);
+    } else if (IsBitmaskEnum(enum_desc, &min_val, &mask)) {
+      enum_verifier_string = absl::Substitute(
+          "new com.google.protobuf.Internal.BitmaskEnumVerifier($0, $1)",
+          min_val, absl::StrCat("0x", absl::Hex(mask, absl::kZeroPad16), "L"));
+    } else {
+      enum_verifier_string = absl::StrCat(var_name, ".internalGetVerifier()");
+    }
+  } else {
+    enum_verifier_string = absl::StrCat(
+        "new com.google.protobuf.Internal.EnumVerifier() {\n"
+        "        @java.lang.Override\n"
+        "        public boolean isInRange(int number) {\n"
+        "          return ",
+        var_name,
+        ".forNumber(number) != null;\n"
+        "        }\n"
+        "      }");
+  }
   printer->Print(variables,
                  absl::StrCat(enum_verifier_string, terminating_string));
 }
