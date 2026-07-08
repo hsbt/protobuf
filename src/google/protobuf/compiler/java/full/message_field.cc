@@ -396,18 +396,28 @@ void ImmutableMessageFieldGenerator::GenerateBuilderParsingCode(
     io::Printer* printer) const {
   if (GetType(descriptor_) == FieldDescriptor::TYPE_GROUP) {
     printer->Print(variables_,
-                   "input.readGroup($number$,\n"
-                   "    "
+                   "if ($name$_ != null || $name$Builder_ != null) {\n"
+                   "  input.readGroup($number$,\n"
+                   "      "
                    "internalGet$capitalized_name$FieldBuilder().getBuilder(),\n"
-                   "    extensionRegistry);\n"
+                   "      extensionRegistry);\n"
+                   "} else {\n"
+                   "  $name$_ = input.readGroup($number$, $type$.parser(), "
+                   "extensionRegistry);\n"
+                   "}\n"
                    "$set_has_field_bit_builder$\n");
   } else {
-    printer->Print(variables_,
-                   "input.readMessage(\n"
-                   "    "
-                   "internalGet$capitalized_name$FieldBuilder().getBuilder(),\n"
-                   "    extensionRegistry);\n"
-                   "$set_has_field_bit_builder$\n");
+    printer->Print(
+        variables_,
+        "if ($name$_ != null || $name$Builder_ != null) {\n"
+        "  input.readMessage(\n"
+        "      "
+        "internalGet$capitalized_name$FieldBuilder().getBuilder(),\n"
+        "      extensionRegistry);\n"
+        "} else {\n"
+        "  $name$_ = input.readMessage($type$.parser(), extensionRegistry);\n"
+        "}\n"
+        "$set_has_field_bit_builder$\n");
   }
 }
 
@@ -700,17 +710,27 @@ void ImmutableMessageOneofFieldGenerator::GenerateBuilderParsingCode(
     io::Printer* printer) const {
   if (GetType(descriptor_) == FieldDescriptor::TYPE_GROUP) {
     printer->Print(variables_,
-                   "input.readGroup($number$,\n"
-                   "    "
+                   "if ($has_oneof_case_message$ || $name$Builder_ != null) {\n"
+                   "  input.readGroup($number$,\n"
+                   "      "
                    "internalGet$capitalized_name$FieldBuilder().getBuilder(),\n"
-                   "    extensionRegistry);\n"
+                   "      extensionRegistry);\n"
+                   "} else {\n"
+                   "  $oneof_name$_ = input.readGroup($number$, "
+                   "$type$.parser(), extensionRegistry);\n"
+                   "}\n"
                    "$set_oneof_case_message$;\n");
   } else {
     printer->Print(variables_,
-                   "input.readMessage(\n"
-                   "    "
+                   "if ($has_oneof_case_message$ || $name$Builder_ != null) {\n"
+                   "  input.readMessage(\n"
+                   "      "
                    "internalGet$capitalized_name$FieldBuilder().getBuilder(),\n"
-                   "    extensionRegistry);\n"
+                   "      extensionRegistry);\n"
+                   "} else {\n"
+                   "  $oneof_name$_ = input.readMessage($type$.parser(), "
+                   "extensionRegistry);\n"
+                   "}\n"
                    "$set_oneof_case_message$;\n");
   }
 }
